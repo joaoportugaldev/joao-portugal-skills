@@ -22,7 +22,7 @@ Use o [ClienteController](../../../../apps/backend/src/modules/comercial/cliente
 
 - O construtor centraliza os caminhos e chama um método privado por operação.
 - Cada método registra o verbo HTTP e aplica o middleware de autenticação antes do handler protegido.
-- O handler extrai os campos aceitos, normaliza filtros e paginação quando aplicáveis e encaminha o contexto autenticado conforme o contrato da operação.
+- O handler extrai os campos aceitos, converte os valores HTTP para os tipos do contrato e encaminha o contexto autenticado. Se o contrato declara `id: string` e `pagina?: number`, entregue um ID textual e converta o parâmetro de paginação em número quando informado.
 - O handler retorna o status e o corpo previstos no contrato. Em caso de falha, encaminha o erro com `next(erro)`.
 
 Formato HTTP inclui a estrutura da requisição e a conversão de valores como paginação. A lista de estados válidos de um teste premium é uma regra do Comercial. Encaminhe o filtro `status` ao caso de uso de listagem e deixe o `StatusTestePremiumVO` validá-lo antes da consulta.
@@ -111,6 +111,7 @@ export default class RecursoController {
 ## Checklist de implementação
 
 - Verbo, caminho, autenticação, payload e status correspondem ao contrato do consumidor.
+- Cada campo HTTP é convertido para o tipo declarado na entrada da operação. O submódulo proprietário aplica as regras de negócio.
 - O método privado usa a operação injetada e encaminha erros ao middleware central.
 - O barrel e a composição registram o controller uma vez.
 - O typecheck ou build do backend e os testes relevantes cobrem a alteração. Requisições `.integration.http` são manuais. Reporte a execução apenas se foram enviadas a um servidor.

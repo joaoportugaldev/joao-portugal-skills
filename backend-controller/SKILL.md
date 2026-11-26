@@ -17,8 +17,8 @@ Implemente o controller como adaptador de entrada HTTP no módulo proprietário.
 - Injete Express, as operações já compostas e o middleware de autenticação quando necessário. Centralize caminhos no construtor e registre cada rota em um método privado.
 - Ao injetar um caso de uso diretamente, importe `UseCase<Entrada, Saída>` de `@sagil/shared`. Esse tipo vem de `packages/shared/src/base/use-case.ts`. Use os tipos públicos da operação como parâmetros e deixe a construção da classe concreta na composição.
 - Aplique a autenticação prevista e encaminhe quem chama como `Actor`, obtido da sessão com `requireActor` (`apps/backend/src/shared/http/actor-from-jwt.ts`). Não repasse o objeto do usuário da sessão nem verifique tipo ou permissão no controller: a autorização de negócio fica no caso de uso, pela porta `AuthProvider` do módulo.
-- Mapeie os dados HTTP para o contrato da operação e encaminhe falhas ao tratamento central com `next(erro)`.
-- Limite a validação no controller ao formato HTTP. Valide valores permitidos de enums de negócio, transições de estado e outras invariantes no submódulo proprietário. Reutilize o caso de uso, a entidade ou o Value Object responsável pela regra.
+- Converta parâmetros de rota, filtros e corpo HTTP nos tipos declarados pelo contrato da operação antes de chamar o caso de uso. Encaminhe falhas ao tratamento central com `next(erro)`.
+- Valide o formato de transporte no controller. Deixe valores permitidos de enums de negócio, transições de estado e outras invariantes no domínio. Reutilize o caso de uso, a entidade ou o Value Object responsável pela regra.
 
 ## Workflow
 

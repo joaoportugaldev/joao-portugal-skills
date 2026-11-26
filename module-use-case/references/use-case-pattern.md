@@ -81,6 +81,8 @@ export class CancelXxxUseCase implements UseCase<CancelXxxIn, XxxDTO> {
 - Contrato:
   - `UseCase<IN, OUT>` implementado corretamente.
   - `execute` com assinatura assíncrona e retorno `Result`.
+  - `IN` usa os tipos esperados, como `id: string`, `pagina?: number` e `tamanhoPagina?: number`. Para status, usar o tipo que representa o contrato da operação.
+  - O controller converte os valores HTTP antes de chamar `execute`. A validação de formato de UUID, valores de status aceitos e limites de paginação segue as regras do módulo.
 - Dependências:
   - Tipadas por interfaces (não acoplar em infraestrutura concreta).
   - Injetadas no construtor.

@@ -13,6 +13,8 @@ Aplicar o padrão de casos de uso do projeto com foco em orquestração de depen
 
 - Ler `references/use-case-pattern.md` antes de criar ou alterar use cases.
 - Implementar o contrato `UseCase<IN, OUT>` com `execute(data: IN): Promise<Result<OUT>>`.
+- Declarar em `IN` os tipos esperados sempre que forem conhecidos. Reservar `unknown` para entradas cujo formato seja genuinamente desconhecido.
+- No controller, converter parâmetros de rota, filtros e corpo HTTP nos tipos de `IN` antes de chamar `execute`. Deixar a validação das regras de negócio no caso de uso, na entidade ou no Value Object responsável.
 - Manter o use case como orquestrador: valida fluxo, chama providers/repos/queries e delega invariantes para entidades/VOs.
 - Injetar dependências via construtor com interfaces de provider/repository/query.
 - Tratar falhas cedo (`early return`) com `Result.fail(...)` ou `result.withFail`.
