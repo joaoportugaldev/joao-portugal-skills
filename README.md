@@ -1,4 +1,4 @@
-# skills-ddd-clean
+# joao-portugal-skills
 
 Coleção de skills para agentes de IA com foco em **Domain-Driven Design (DDD)** e **Clean Architecture**, pensada para padronizar a arquitetura e a forma de implementação em múltiplos projetos.
 
