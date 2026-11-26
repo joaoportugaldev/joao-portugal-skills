@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fachadas de aplicação"
+  short_description: "Crie ou revise facades de módulos DDD"
+  default_prompt: "Use $module-facade para criar ou revisar uma facade e sua composição."

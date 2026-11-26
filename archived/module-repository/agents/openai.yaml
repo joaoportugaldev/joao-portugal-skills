@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repositórios"
+  short_description: "Crie ou revise repositórios"
+  default_prompt: "Use $module-repository para criar ou revisar um repositório."

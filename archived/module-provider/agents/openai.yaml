@@ -1,0 +1,4 @@
+interface:
+  display_name: "Providers de módulos"
+  short_description: "Crie ou revise portas Provider de módulos"
+  default_prompt: "Use $module-provider para criar ou revisar uma interface Provider."
