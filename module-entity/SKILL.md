@@ -13,6 +13,7 @@ Aplicar o padrão de Entidades do projeto com foco em identidade (`id`), invaria
 
 - Ler `references/entity-pattern.md` antes de criar/alterar entidades.
 - Estender `Entity<Type, Props>` de `@namespace/shared` e manter construtor `private` ou `protected`.
+- Em `XxxProps extends EntityProps`, declarar apenas os campos próprios da entidade. Herdar `id`, `createdAt`, `updatedAt` e `deletedAt` de `EntityProps` sem redeclará-los, inclusive nos tipos de criação derivados. Para acessar o identificador obrigatório da entidade criada, usar `entity.id`.
 - Expor API consistente: `create` (throw) e `tryCreate` (`Result`).
 - Validar invariantes com VOs (`Id`, `Name`, `Text`, `Number`, `Sku`, etc.) e `Result.combine`.
 - Persistir no `props` apenas valores normalizados (`instance.value`, `instance.props` quando aplicável).
