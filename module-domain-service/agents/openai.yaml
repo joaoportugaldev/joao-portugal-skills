@@ -1,0 +1,4 @@
+interface:
+  display_name: "Serviços de domínio"
+  short_description: "Crie ou revise serviços de domínio"
+  default_prompt: "Use $module-domain-service para criar ou revisar um serviço de domínio."

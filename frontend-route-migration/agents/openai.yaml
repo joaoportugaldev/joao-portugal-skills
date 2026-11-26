@@ -1,0 +1,4 @@
+interface:
+  display_name: "Migração de rotas de frontend"
+  short_description: "Migre URLs no Next.js Pages Router"
+  default_prompt: "Use $frontend-route-migration para migrar uma rota do frontend preservando o comportamento da página."

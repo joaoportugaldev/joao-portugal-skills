@@ -1,0 +1,4 @@
+interface:
+  display_name: "Providers do backend"
+  short_description: "Crie ou revise implementações Provider no backend"
+  default_prompt: "Use $backend-provider para criar ou revisar uma implementação Provider no backend."

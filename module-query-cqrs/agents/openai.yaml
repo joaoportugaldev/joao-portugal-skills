@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Module Query CQRS'
+  short_description: 'Criar queries de modulo no padrao CQRS'
+  default_prompt: 'Use $module-query-cqrs para declarar consultas em arquivos .query.ts, inclusive as usadas antes de uma escrita.'

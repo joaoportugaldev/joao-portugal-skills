@@ -1,0 +1,4 @@
+interface:
+  display_name: "Controllers HTTP com Express"
+  short_description: "Crie ou revise controllers HTTP no backend"
+  default_prompt: "Use $backend-controller para criar ou revisar um controller HTTP no módulo proprietário."

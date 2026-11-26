@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Module Repository'
+  short_description: 'Criar repositórios de módulo só com comandos'
+  default_prompt: 'Use $module-repository para separar comandos de persistência das consultas, inclusive das usadas antes de uma escrita.'

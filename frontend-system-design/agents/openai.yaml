@@ -1,0 +1,4 @@
+interface:
+  display_name: "System Design de frontend"
+  short_description: "Crie e documente componentes reutilizáveis"
+  default_prompt: "Use $frontend-system-design para criar, atualizar ou registrar um componente no catálogo interno."

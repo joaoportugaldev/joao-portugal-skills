@@ -36,9 +36,11 @@ Base rules:
 - DTO: `.dto.ts`
 - Value object: `.vo.ts`
 - Entity: `.entity.ts`
+- Enum: `.enum.ts` (nome em kebab-case; símbolo em PascalCase com sufixo `Enum`)
 - Use case: `.use-case.ts`
 - Repository: `.repository.ts`
 - Query (CQRS): `.query.ts`
+- Persistence mapper: `.mapper.ts` (ex.: `reserva.mapper.ts`, classe `ReservaMapper`)
 - Service: `.service.ts`
 - Controller (Nest): `.controller.ts`
 - Module (Nest): `.module.ts`

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Configurar módulo de negócio"
+  short_description: "Crie um workspace para um novo módulo de negócio"
+  default_prompt: "Use $config-new-module para criar um módulo neste monorepo."

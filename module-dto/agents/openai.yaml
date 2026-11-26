@@ -1,0 +1,4 @@
+interface:
+  display_name: "Data Transfer Objects"
+  short_description: "Crie ou revise contratos de dados de módulos"
+  default_prompt: "Use $module-dto para criar ou revisar um DTO e seu mapeamento."
