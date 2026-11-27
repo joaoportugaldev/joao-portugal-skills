@@ -1,7 +1,7 @@
 ---
 name: module-aggregate
 description: >-
-  Gere a estrutura inicial de um agregado DDD em um pacote de domínio existente do Sagil. Use quando o pedido envolver scaffold de agregado em modules/<pacote>, geração de entidade, DTO, repositório e casos de uso, ou os modos crud e example.
+  Gere a estrutura inicial de um agregado DDD em um pacote de domínio existente. Use quando o pedido envolver scaffold de agregado em modules/<pacote>, geração de entidade, DTO, repositório e casos de uso, ou os modos crud e example.
 ---
 
 # Module Aggregate

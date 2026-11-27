@@ -13,7 +13,7 @@ Aplicar o padrão de Value Object do projeto, garantindo imutabilidade, validaç
 
 - Ler `references/vo-pattern.md` antes de criar ou modificar VOs.
 - Reutilizar o padrão existente de `ValueObject`, `Result` e `ValueObjectConfig`.
-- Preferir validações explícitas com códigos de erro estáticos (ex.: `INVALID_EMAIL`).
+- Preferir validações explícitas com códigos de erro estáticos no formato `entidade.motivo` (ex.: `pedido.status-invalido`), devolvidos com `Result.fail`, sem `try`/`catch`.
 - Expor métodos auxiliares apenas quando agregam valor (ex.: getters derivados).
 
 ## Workflow

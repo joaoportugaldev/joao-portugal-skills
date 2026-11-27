@@ -1,6 +1,6 @@
 ---
 name: openspec-propose
-description: Propose a new OpenSpec change from a direct user request with all required artifacts generated in one step. Use for generic change proposals that do not originate from a Sagil Scrum Jira Product/Feature Card; when Jira is the source, use openspec-propose-from-jira-card instead.
+description: Propose a new OpenSpec change from a direct user request with all required artifacts generated in one step. Use for generic change proposals that do not originate from a Jira Product/Feature Card; when Jira is the source, use openspec-propose-from-jira-card instead.
 license: MIT
 metadata:
   author: openspec

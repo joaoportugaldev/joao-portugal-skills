@@ -4,6 +4,28 @@
 
 Um DTO pode levar dados para uma operação, devolver um resultado ou representar uma projeção de leitura. Identifique a finalidade para escolher os campos. Nomeie pelo conceito, como `ProdutoDTO`, ou pela intenção, como `FiltroProdutosDTO`, seguindo a mesma convenção de nomenclatura.
 
+## DTO principal do agregado
+
+O DTO principal é o DTO da entidade. Ele estende as `Props` da entidade, é produzido por `Entidade.toDTO`, é o que `findById` do repositório devolve e o que os comandos de gravação recebem. O nome é o da entidade mais `DTO`, sem outra palavra.
+
+| Entidade | DTO principal | Arquivo | Incorreto |
+| --- | --- | --- | --- |
+| `Produto` | `ProdutoDTO` | `produto.dto.ts` | `ProdutoEstadoDTO`, `ProdutoCompletoDTO`, `DadosProdutoDTO` |
+
+Os demais DTOs do agregado levam o nome do conjunto de dados que transportam e nunca usam o nome puro `<Entidade>DTO`:
+
+```ts
+// produto/dto/produto.dto.ts — DTO principal: estende as props da entidade.
+export interface ProdutoDTO extends ProdutoProps {}
+
+// produto/dto/produto-listado.dto.ts — projeção da listagem: só os campos da tabela.
+export interface ProdutoListadoDTO {
+  id: string;
+  nome: string;
+  nomeCategoria: string;
+}
+```
+
 ## Modelagem do contrato
 
 - Explicite os campos, a diferença entre ausência e `null`, e a representação de datas, valores monetários e identificadores quando relevantes.
@@ -56,4 +78,5 @@ export class Produto extends Entity<Produto, ProdutoProps> {
 - Criar um DTO de paginação próprio do agregado em vez de usar o do pacote compartilhado.
 - Retornar a entidade diretamente ou espalhar suas propriedades no payload. Selecione os campos públicos em `toDTO`.
 - Reutilizar o mesmo DTO para operações cujos contratos evoluem de forma independente. Modele a forma que cada consumidor precisa.
+- Dar ao DTO da entidade um nome com palavra extra (`ProdutoEstadoDTO`), ou dar o nome `ProdutoDTO` a uma projeção que não estende as props da entidade.
 - Acoplar a resposta pública à estrutura de armazenamento. Converta para a representação da fronteira.

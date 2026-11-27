@@ -18,10 +18,55 @@ Use `<capacidade>-<tecnologia>.provider.ts` para a implementação e `<Capacidad
 
 `<tecnologia>` identifica a integração ou estratégia concreta, como Resend, Z-API ou captura. Não coloque o fornecedor no nome da interface do módulo. Para seleção entre implementações, use `<capacidade>-provider.factory.ts`; a factory não é uma implementação da porta.
 
+## Exemplo
+
+Porta declarada no módulo consumidor, em `modules/notificacao/src/envio/provider/envio-email.provider.ts`:
+
+```ts
+import type { Result } from "@poiesis/shared";
+import type { EmailDTO } from "../dto/email.dto";
+
+export interface EnvioEmailProvider {
+  enviar(email: EmailDTO): Promise<Result<void>>;
+}
+```
+
+Implementação no backend, em `providers/envio-email-resend.provider.ts`. O adaptador recebe o cliente pronto, traduz o contrato do fornecedor e converte a exceção em `Result`:
+
+```ts
+import { Result } from "@poiesis/shared";
+import type { EmailDTO, EnvioEmailProvider } from "@namespace/notificacao/envio";
+import type { Resend } from "resend";
+
+export class EnvioEmailResendProvider implements EnvioEmailProvider {
+  constructor(
+    private readonly cliente: Resend,
+    private readonly remetente: string,
+  ) {}
+
+  async enviar({ destinatario, assunto, html }: EmailDTO): Promise<Result<void>> {
+    try {
+      const { error } = await this.cliente.emails.send({ from: this.remetente, to: destinatario, subject: assunto, html });
+      return error ? Result.fail("envio-email.recusado-pelo-provedor") : Result.ok();
+    } catch {
+      return Result.fail("envio-email.provedor-indisponivel");
+    }
+  }
+}
+```
+
+Função auxiliar compartilhada pelos adaptadores, em `providers/remetente-padrao.util.ts`:
+
+```ts
+export function remetentePadrao(ambiente: string): string {
+  return ambiente === "production" ? "contato@exemplo.com" : "teste@exemplo.com";
+}
+```
+
 ## Contrato e composição
 
 - Importe as interfaces pela API pública dos módulos consumidores. Um adaptador compartilhado pode implementar mais de uma porta quando satisfizer cada contrato.
 - Injete credenciais, clientes e coletores necessários. Traduza respostas e falhas externas para os resultados e erros exigidos por cada porta.
 - Mantenha a escolha entre envio real e captura na factory e entregue o adaptador pronto na composição. Preserve as regras de ambiente vigentes.
-- A porta `AuthProvider` de cada módulo já é atendida pelo adaptador compartilhado `AuthFacadeProvider` (`apps/backend/src/shared/provider/`), criado por `createAuthProvider`. Não crie um adaptador de autorização por módulo; se a porta precisar de um método novo, ele entra primeiro no catálogo da ADR `adr-shared-autorizacao-por-auth-provider`.
+- Quando o projeto já tem um adaptador compartilhado que atende à mesma porta em vários módulos (por exemplo, o de autorização), reutilize-o. Não crie um adaptador equivalente por módulo.
 - Verifique os consumidores, exports e testes após renomeações. Use os testes próximos para cobrir a seleção e a tradução quando esses comportamentos mudarem.

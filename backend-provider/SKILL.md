@@ -16,6 +16,8 @@ Implemente no backend uma capacidade definida por uma porta de saída do módulo
 - Escolha a pasta pela abrangência real: dentro da capacidade do módulo backend quando apenas ela usa o adaptador; em `apps/backend/src/shared/provider/` quando a implementação serve a mais de um módulo.
 - Nomeie o arquivo `<capacidade>-<tecnologia>.provider.ts` e a classe `<Capacidade><Tecnologia>Provider`. Use a capacidade da porta e termine o nome da classe em `Provider`.
 - Faça a classe cumprir as interfaces consumidoras por seus contratos públicos. Traduza erros e dados da tecnologia na implementação, sem vazar seus tipos para as portas.
+- Todo arquivo do adaptador tem sufixo de tipo. Um arquivo que só exporta funções auxiliares dos adaptadores (ler linhas, montar a página, extrair o ator da requisição) chama-se `<nome>.util.ts`. Não use nome sem sufixo (`paginacao-pedidos.ts`) nem só com a tecnologia (`paginacao-pedidos.knex.ts`).
+- O `try`/`catch` das exceções da tecnologia fica no adaptador, que devolve `Result` com um código de falha. Nenhuma exceção atravessa a porta.
 - Quando a seleção entre implementações depender do ambiente, mantenha a factory junto dos adaptadores, com nome `<capacidade>-provider.factory.ts`; construa a dependência concreta na composição, não no caso de uso ou controller.
 
 ## Workflow

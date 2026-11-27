@@ -68,7 +68,7 @@ Domain packages use per-feature folders with `dto/`, `model/`, `provider/`, and 
 ## 4.2 One declaration per file
 
 Each source file in a domain package exports one main declaration, and the filename names it
-(`contrato-listado.dto.ts` exports `ContratoListadoDTO`). This applies to DTOs, port interfaces
+(`pedido-listado.dto.ts` exports `PedidoListadoDTO`). This applies to DTOs, port interfaces
 (`*.provider.ts`, `*.query.ts`, `*.repository.ts`), value objects, enums and services.
 
 Allowed exceptions (the only ones):
@@ -78,8 +78,10 @@ Allowed exceptions (the only ones):
   the input and output of that use case. No other type is declared there.
   Each `XxxIn` declares all of its own fields: do not create an interface or DTO to share fields between the
   inputs of different use cases, and do not make one `XxxIn` extend another, even when the fields repeat.
-- The input type of a query (its filter) is declared in the same file as the query (`xxx.query.ts`), because it
-  is the input of that query. The output of a query is always a DTO in `dto/`.
+- The input type of a query is declared in the same file as the query (`xxx.query.ts`), because it is the
+  input of that query. It is named after the query with the suffix `In`: `ListagemPedidosQuery` receives
+  `ListagemPedidosQueryIn`. Do not name it `XxxFiltroDTO` or `XxxDTO`. A small input may be written inline
+  (`Query<{ id: string }, PedidoDTO | null>`). The output of a query is always a DTO in `dto/`.
 - `index.ts` barrels re-export several symbols.
 
 Consequences:
@@ -106,12 +108,21 @@ Domain and application code report expected failures with `Result` from the shar
 declare its own helpers to convert between exceptions and `Result`, and does not `throw` across the
 boundary of a use case, port or entity method. The only exceptions thrown are the ones the shared package
 itself defines (`create`, `validator.throwsIf*`), and only inside `Result.try`/`Result.tryAsync`.
-Failure codes are strings in the `entidade.motivo` format (for example `teste-premium.acesso-negado`).
+Failure codes are strings in the `entidade.motivo` format (for example `pedido.acesso-negado`).
+
+Domain and application code does not write `try`/`catch`. Ports return `Result`, so a use case only checks
+`isFailure`. When a step must not let an unexpected exception escape (for example, an external system has
+already accepted the operation and the local state has to record it), move that step to a private method and
+call it through `Result.tryAsync(() => this.step(...))`, then handle the failed `Result`. `try`/`catch`
+belongs to backend adapters, which translate the exceptions of a technology into `Result`.
+
+When a change stops emitting a failure code, delete its constant in the same change, after confirming with a
+search that nothing else references it.
 
 A failure carries only its codes. Do not attach the rejected value, the class name, the use case name or
 any other context to it; when refactoring code that did (`lancar(codigo, valor, extras)`), drop that context.
 
-When the caller needs data to decide its next step (for example, which units require confirmation), the
+When the caller needs data to decide its next step (for example, which items require confirmation), the
 operation has not failed. Model it as a successful result: `XxxOut` is a union discriminated by a `status`
 field, each variant carrying its own data, and the use case returns `Result.ok(...)` for every variant. The
 controller answers with a success status and the outcome in the body; the client reads `status` to decide
@@ -127,6 +138,47 @@ An aggregate does not declare converter classes or inject converters into use ca
 the owner of the data: `static toDTO` on the entity; a method or getter on the value object; a domain service
 when several use cases share the rule; the use case itself when the shaping is specific to its output. Rows
 and external contracts are translated by backend mappers and provider adapters.
+
+## 4.6 Services, helper files and persistence results
+
+- A domain service is a class named `XxxService` in `service/xxx.service.ts`, with static methods when it
+  holds no state. A `*.service.ts` file does not export loose functions, and a service is not re-exported
+  through the barrel of another folder (such as `enums/index.ts`).
+- A domain package has no `*.util.ts` files. A helper used by more than one use case is a domain service;
+  a helper used by a single use case is a private method of that use case.
+- In backend adapters every file has a type suffix. A file that only exports helper functions for the
+  adapters (reading rows, building a page, extracting the actor from the request) is named `<name>.util.ts`.
+  A name without a type suffix (`paginacao-pedidos.ts`) or with only the technology (`paginacao-pedidos.knex.ts`)
+  is not allowed.
+
+## 4.7 What crosses a port is data
+
+Everything that crosses a port (use case, query, repository, provider) is data: `XxxIn`/`XxxOut`,
+`XxxQueryIn` or a DTO. Entities and value objects do not cross ports, neither as input nor as output.
+
+- A query returns `Result` of a DTO. A repository command receives a DTO and returns `Result<void>` or
+  `Result` of a DTO. No port method receives or returns an entity.
+- A repository may expose `findById(id)`, returning `Result` of the state DTO or `null`. It belongs to the
+  command context: a use case that changes the aggregate uses it to load the state it will validate and
+  change. It is the only read allowed in a repository; listings, filters, projections and existence checks
+  are queries.
+- A `BuscarXxxPorIdQuery` (`*.query.ts`) serves the read context: a use case such as `obter-xxx-por-id`,
+  whose whole job is to return the data. A read use case does not depend on the repository.
+- A use case that already receives the repository of an entity loads that entity with the repository's
+  `findById`; it does not also receive a query by ID for the same entity. A write use case may receive a
+  query by ID for another reason, for example to read an entity whose repository it does not receive.
+- When a use case needs the entity, it loads the state (`repository.findById` in a write use case) and
+  rebuilds it with `Entidade.tryCreate(dto)`.
+- The DTO handed to a write command is always produced by the entity (`Entidade.toDTO(entidade)`), never an
+  object literal assembled in the use case. This keeps every persisted state validated by `tryCreate`.
+- The main DTO of an aggregate is the DTO of its entity: it extends the entity's `XxxProps`, it is what
+  `Entidade.toDTO` produces, what `findById` returns and what the write commands receive. It is named with the
+  entity name plus `DTO` and nothing else: entity `Pedido`, DTO `PedidoDTO`, file `pedido.dto.ts`. Do not add
+  words such as `Estado`, `Completo` or `Dados` (`PedidoEstadoDTO`). Every other DTO is named after the set of
+  data it carries (`PedidoListadoDTO`, `ResumoPedidoDTO`) and never takes the plain `<Entidade>DTO` name.
+- Backend adapters do not build entities: the mapper has `toTable(dto)` and `toDTO(row)`, and no `toDomain`.
+- Inside the domain, entities, value objects and domain services exchange model objects. An entity method
+  returns `Result` of the entity; a domain service may receive an entity or a value object.
 
 ## 5. Skill Authoring Rules
 
@@ -145,7 +197,7 @@ When editing any skill (`*/SKILL.md`):
   this repository. Only `.env/skills.config.example.json` is versioned here.
 - Never commit a real project namespace (scope) in scripts, assets, or docs. Use placeholders (`@namespace`, `@my-org`)
   or template tokens (`__AUTH_PACKAGE_NAME__`, `__SHARED_PACKAGE_NAME__`, `__PROJECT_SCOPE_SLUG__`).
-- The shared package name is fixed: `@mentoria-360/shared` (`SHARED_PACKAGE_NAME` in `utils/resolve-skill-config.mjs`).
+- The shared package name is fixed: `@poiesis/shared` (`SHARED_PACKAGE_NAME` in `utils/resolve-skill-config.mjs`).
   It is an external submodule with its own scope and must never be derived from the project namespace.
 
 ## 6. Quick Examples

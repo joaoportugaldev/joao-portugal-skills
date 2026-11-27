@@ -1,4 +1,4 @@
 interface:
-  display_name: "Estrutura de agregado no Sagil"
+  display_name: "Estrutura de agregado"
   short_description: "Gere a estrutura inicial de um agregado"
   default_prompt: "Use $module-aggregate para gerar a estrutura de um agregado em um pacote existente."

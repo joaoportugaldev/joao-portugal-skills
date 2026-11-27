@@ -18,97 +18,139 @@ Adapte esses caminhos à estrutura do projeto consumidor.
 
 ## Padrões de implementação
 
-Use o [ClienteController](../../../../apps/backend/src/modules/comercial/cliente/controllers/cliente.controller.ts) como referência de granularidade. Ele reúne consultas e alterações do Cliente em uma classe e declara os caminhos no construtor. Separe controllers quando houver recursos ou capacidades distintas. Ao consolidar, preserve aliases, precedência e a cadeia de middleware de cada rota.
+Um controller reúne as operações de um recurso em uma classe e declara os caminhos no construtor. Separe controllers quando houver recursos ou capacidades distintas. Ao consolidar, preserve aliases, precedência e a cadeia de middleware de cada rota.
 
 - O construtor centraliza os caminhos e chama um método privado por operação.
 - Cada método registra o verbo HTTP e aplica o middleware de autenticação antes do handler protegido.
-- O handler extrai os campos aceitos, converte os valores HTTP para os tipos do contrato e encaminha o contexto autenticado. Se o contrato declara `id: string` e `pagina?: number`, entregue um ID textual e converta o parâmetro de paginação em número quando informado.
+- O handler extrai os campos aceitos, converte os valores HTTP para os tipos do contrato e encaminha o contexto autenticado. Se o contrato declara `id: string` e `page?: number`, entregue um ID textual e converta o parâmetro de paginação em número quando informado.
 - O handler retorna o status e o corpo previstos no contrato. Em caso de falha, encaminha o erro com `next(erro)`.
 
-Formato HTTP inclui a estrutura da requisição e a conversão de valores como paginação. A lista de estados válidos de um teste premium é uma regra do Comercial. Encaminhe o filtro `status` ao caso de uso de listagem e deixe o `StatusTestePremiumVO` validá-lo antes da consulta.
+Formato HTTP inclui a estrutura da requisição e a conversão de valores como paginação. A lista de status válidos de um pedido é uma regra do domínio: encaminhe o filtro `status` ao caso de uso de listagem e deixe o objeto de valor validá-lo antes da consulta.
 
-### Injeção direta de casos de uso
+### Exemplo: casos de uso injetados diretamente
 
-Tipifique cada dependência com o contrato compartilhado. O handler chama `execute`, converte a instância do `Result` em resposta HTTP e encaminha a falha mapeada com `next(erro)`.
-
-```ts
-import type { UseCase } from "@sagil/shared";
-import type { CriarTestePremiumIn, TestePremiumDTO } from "@sagil/comercial";
-
-type CriarTestePremium = UseCase<CriarTestePremiumIn, TestePremiumDTO>;
-```
-
-### Exemplo legado com facade
-
-Este exemplo mostra a estrutura de registro de rotas em controllers que ainda dependem de uma Facade. Em agregados novos ou refatorados, injete os casos de uso diretamente, como no trecho acima; não crie Facade.
-
-O middleware injetado autentica a requisição e preenche `req.jwtDecoded` antes de chamar o handler. O controller converte a sessão em `Actor` com `requireActor` e o entrega à operação; ele não decide quem pode executá-la.
+O controller recebe cada caso de uso tipado como `UseCase<XxxIn, XxxOut>`, já construído pela composição. Não há Facade. `requireActor` e `HttpHelper` são os helpers HTTP do projeto: o primeiro converte a sessão em `Actor`; o segundo lança o erro HTTP correspondente ao código de falha do `Result`, que o middleware central formata.
 
 ```ts
-import type { Actor } from "@sagil/shared";
+import type { UseCase } from "@poiesis/shared";
+import type {
+  CancelarPedidoIn,
+  CriarPedidoIn,
+  FecharPedidoIn,
+  FecharPedidoOut,
+  ListarPedidosIn,
+  ListarPedidosOut,
+  PedidoDTO,
+} from "@namespace/vendas/pedido";
 import type { Express, RequestHandler } from "express";
 import { requireActor } from "../../../shared/http/actor-from-jwt";
+import { HttpHelper } from "../../../shared/http/http.helper";
 
-type EntradaCriarRecurso = { nome: string };
-type RecursoDTO = { id: string; nome: string };
+export class PedidoController {
+  constructor(
+    private readonly servidor: Express,
+    private readonly casosDeUso: {
+      criar: UseCase<CriarPedidoIn, PedidoDTO>;
+      listar: UseCase<ListarPedidosIn, ListarPedidosOut>;
+      fechar: UseCase<FecharPedidoIn, FecharPedidoOut>;
+      cancelar: UseCase<CancelarPedidoIn, PedidoDTO>;
+    },
+    private readonly autenticar: RequestHandler,
+  ) {
+    this.Criar("/pedidos");
+    this.Listar("/pedidos");
+    this.Fechar("/pedidos/:id/fechamento");
+    this.Cancelar("/pedidos/:id/cancelamento");
+  }
 
-interface RecursoFacade {
-    criarRecurso(entrada: EntradaCriarRecurso, actor: Actor): Promise<RecursoDTO>;
-    obterRecursoPorId(entrada: { id: string }, actor: Actor): Promise<RecursoDTO>;
-}
+  private Criar(rota: string): void {
+    this.servidor.post(rota, this.autenticar, async (req, res, next) => {
+      try {
+        const resultado = await this.casosDeUso.criar.execute({
+          actor: requireActor(req.jwtDecoded),
+          clienteId: String(req.body?.clienteId ?? ""),
+          itens: Array.isArray(req.body?.itens) ? req.body.itens : [],
+        });
+        HttpHelper.throwsIfFailed(resultado);
+        res.status(201).json(resultado.instance);
+      } catch (erro) {
+        next(erro);
+      }
+    });
+  }
 
-export default class RecursoController {
-    constructor(
-        private readonly servidor: Express,
-        private readonly facade: RecursoFacade,
-        private readonly autenticar: RequestHandler,
-    ) {
-        this.CriarRecurso("/recursos");
-        this.ObterRecursoPorId("/recursos/:id");
-    }
+  private Listar(rota: string): void {
+    this.servidor.get(rota, this.autenticar, async (req, res, next) => {
+      try {
+        const { status, pagina, tamanhoPagina } = req.query;
+        const resultado = await this.casosDeUso.listar.execute({
+          actor: requireActor(req.jwtDecoded),
+          status: typeof status === "string" ? status : undefined,
+          // Os parâmetros da URL seguem o idioma da API; o caso de uso recebe o formato do pacote compartilhado.
+          page: pagina === undefined ? undefined : Number(pagina),
+          pageSize: tamanhoPagina === undefined ? undefined : Number(tamanhoPagina),
+        });
+        HttpHelper.throwsIfFailed(resultado);
+        res.status(200).json(resultado.instance);
+      } catch (erro) {
+        next(erro);
+      }
+    });
+  }
 
-    private CriarRecurso(rota: string): void {
-        this.servidor.post(
-            rota,
-            this.autenticar,
-            async (req, res, next) => {
-                try {
-                    const entrada: EntradaCriarRecurso = {
-                        nome: req.body.nome,
-                    };
-                    const recurso = await this.facade.criarRecurso(
-                        entrada,
-                        requireActor(req.jwtDecoded),
-                    );
+  private Fechar(rota: string): void {
+    this.servidor.post(rota, this.autenticar, async (req, res, next) => {
+      try {
+        const resultado = await this.casosDeUso.fechar.execute({
+          actor: requireActor(req.jwtDecoded),
+          id: String(req.params.id),
+          itensSemEstoqueConfirmadosIds: req.body?.itensSemEstoqueConfirmadosIds,
+        });
+        HttpHelper.throwsIfFailed(resultado);
+        // `FecharPedidoOut` é uma união por `status`. Todo desfecho é sucesso: o cliente lê `status`.
+        res.status(200).json(resultado.instance);
+      } catch (erro) {
+        next(erro);
+      }
+    });
+  }
 
-                    res.status(201).json(recurso);
-                } catch (erro) {
-                    next(erro);
-                }
-            },
-        );
-    }
-
-    private ObterRecursoPorId(rota: string): void {
-        this.servidor.get(
-            rota,
-            this.autenticar,
-            async (req, res, next) => {
-                try {
-                    const recurso = await this.facade.obterRecursoPorId(
-                        { id: String(req.params.id) },
-                        requireActor(req.jwtDecoded),
-                    );
-
-                    res.status(200).json(recurso);
-                } catch (erro) {
-                    next(erro);
-                }
-            },
-        );
-    }
+  private Cancelar(rota: string): void {
+    this.servidor.post(rota, this.autenticar, async (req, res, next) => {
+      try {
+        const resultado = await this.casosDeUso.cancelar.execute({
+          actor: requireActor(req.jwtDecoded),
+          id: String(req.params.id),
+          motivo: String(req.body?.motivo ?? ""),
+        });
+        HttpHelper.throwsIfFailed(resultado);
+        res.status(200).json(resultado.instance);
+      } catch (erro) {
+        next(erro);
+      }
+    });
+  }
 }
 ```
+
+Composição, em `bootstrap/api.ts`: cada caso de uso é construído com suas portas e entregue ao controller.
+
+```ts
+const pedidoRepository = new PedidoRepositoryKnex(conexao);
+
+new PedidoController(
+  servidor,
+  {
+    criar: new CriarPedidoUseCase(pedidoRepository),
+    listar: new ListarPedidosUseCase(new ListagemPedidosQueryKnex(conexao), auth),
+    fechar: new FecharPedidoUseCase(pedidoRepository, estoque, auth),
+    cancelar: new CancelarPedidoUseCase(pedidoRepository, auth),
+  },
+  autenticar,
+);
+```
+
+Controllers que ainda dependem de uma Facade são legado. Ao refatorar o agregado, troque a Facade pelos casos de uso, como acima.
 
 ## Checklist de implementação
 

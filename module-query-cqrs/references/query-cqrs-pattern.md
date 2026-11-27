@@ -2,14 +2,15 @@
 
 ## Quando usar Query (CQRS)
 
-- Toda operação de leitura, inclusive a busca por ID, a consulta de registros ativos e a verificação de existência antes de um comando.
+- Operações de leitura: listagens, a consulta de registros ativos, a verificação de existência antes de um comando e a busca por ID de um caso de uso de leitura (`obter-cartao-por-id`).
+- Exceção: carregar por ID o estado que um caso de uso vai alterar é `findById` do Repository.
 - Projeções com paginação, filtros, agregações e joins.
-- DTO orientado ao consumidor. Para preparar uma escrita, incluir os campos necessários para reconstituir a entidade e verificar precondições.
+- DTO orientado ao consumidor.
 
 ## Quando usar Repository (comando)
 
-- Expor exclusivamente comandos de persistência, como `create`, `update` e `delete`.
-- Em um comando que precisa do estado atual, o caso de uso chama a Query, aplica as regras de domínio com a entidade e chama o Repository para persistir. Garantias que precisam ser atômicas devem ser verificadas na escrita.
+- Expor comandos de persistência, como `create`, `update` e `delete`, e `findById` como única leitura.
+- Em um comando que precisa do estado atual, o caso de uso chama `repository.findById`, reconstrói a entidade com `tryCreate`, aplica as regras de domínio e entrega ao Repository o DTO produzido por `Entidade.toDTO`. Garantias que precisam ser atômicas devem ser verificadas na escrita.
 
 ## DTO em Query: regra de modelagem
 
@@ -79,7 +80,7 @@ O adaptador envolve o DTO ou a página em `Result`, mantendo contagens e pagina�
 
 ## Listagens paginadas
 
-- Usar os contratos do pacote compartilhado, sem redeclará-los: o DTO de filtro estende `PaginatedInputDTO` (`page`, `pageSize`) e a query retorna `Promise<Result<PaginatedResultDTO<ItemDTO>>>` (`data` e `meta`). Preservar `meta` quando o caso de uso transformar `data`.
+- Usar os contratos do pacote compartilhado, sem redeclará-los: a entrada da query (`XxxQueryIn`) estende `PaginatedInputDTO` (`page`, `pageSize`) e a query retorna `Promise<Result<PaginatedResultDTO<ItemDTO>>>` (`data` e `meta`). Preservar `meta` quando o caso de uso transformar `data`.
 - Validar `page` e `pageSize` como inteiros positivos. Retornar `Result.fail` para valores inválidos.
 - No adaptador, calcular o deslocamento como `(page - 1) * pageSize`. Aplicar filtros e ordenação determinística, com ID único como desempate, antes de `limit` e `offset`.
 - Calcular `meta.total` com os mesmos filtros da seleção dos itens, dentro do escopo autorizado e ignorando o recorte da página. Calcular `meta.totalPages` a partir de `total` e `pageSize`.
@@ -97,17 +98,85 @@ export interface Query<IN, OUT> {
 
 Cada consulta do módulo estende esse contrato, em arquivo próprio:
 
-```ts
-// provider/cartoes-paginados.query.ts
-export interface CartoesPaginadosQuery extends Query<PaginatedInputDTO, PaginatedResultDTO<CartaoDTO>> {}
+`provider/buscar-cartao-por-id.query.ts` — usada pelo caso de uso de leitura `obter-cartao-por-id`; entrada pequena, escrita direto no contrato:
 
-// provider/nome-cartao-em-uso.query.ts — a entrada da query fica no arquivo da query
-export interface NomeCartaoEmUsoDTO {
-  name: string;
-  ignoreId?: string;
+```ts
+import type { Query } from "@poiesis/shared";
+import type { CartaoDTO } from "../dto/cartao.dto";
+
+export interface BuscarCartaoPorIdQuery extends Query<{ id: string }, CartaoDTO | null> {}
+```
+
+`provider/listagem-cartoes.query.ts` — a entrada tem nome próprio: o nome da query seguido de `In`, no mesmo arquivo:
+
+```ts
+import type { PaginatedInputDTO, PaginatedResultDTO, Query } from "@poiesis/shared";
+import type { CartaoDTO } from "../dto/cartao.dto";
+
+export interface ListagemCartoesQueryIn extends PaginatedInputDTO {
+  bandeira?: string;
+  busca?: string;
 }
 
-export interface NomeCartaoEmUsoQuery extends Query<NomeCartaoEmUsoDTO, boolean> {}
+export interface ListagemCartoesQuery extends Query<ListagemCartoesQueryIn, PaginatedResultDTO<CartaoDTO>> {}
+```
+
+`use-case/listar-cartoes.use-case.ts` — o caso de uso declara os próprios campos de entrada e monta a entrada da query:
+
+```ts
+import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, Result, type PaginatedResultDTO, type UseCase } from "@poiesis/shared";
+import type { CartaoDTO } from "../dto/cartao.dto";
+import type { ListagemCartoesQuery } from "../provider/listagem-cartoes.query";
+
+export interface ListarCartoesIn {
+  bandeira?: string;
+  busca?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export type ListarCartoesOut = PaginatedResultDTO<CartaoDTO>;
+
+export class ListarCartoesUseCase implements UseCase<ListarCartoesIn, ListarCartoesOut> {
+  constructor(private readonly listagem: ListagemCartoesQuery) {}
+
+  async execute({ bandeira, busca, page = DEFAULT_PAGE, pageSize = DEFAULT_PAGE_SIZE }: ListarCartoesIn): Promise<Result<ListarCartoesOut>> {
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(pageSize) || pageSize < 1) {
+      return Result.fail("cartao.paginacao-invalida");
+    }
+    return this.listagem.execute({ bandeira, busca: busca?.trim() || undefined, page, pageSize });
+  }
+}
+```
+
+No backend, `queries/listagem-cartoes.query.knex.ts` implementa o contrato. O exemplo usa Knex; adapte ao cliente de banco do projeto. O `try`/`catch` fica aqui, no adaptador, que traduz a falha técnica em `Result`:
+
+```ts
+import { Result, type PaginatedResultDTO } from "@poiesis/shared";
+import type { CartaoDTO, ListagemCartoesQuery, ListagemCartoesQueryIn } from "@namespace/pagamento/cartao";
+import type { Knex } from "knex";
+import { CartaoMapper } from "../db/cartao.mapper";
+
+export class ListagemCartoesQueryKnex implements ListagemCartoesQuery {
+  constructor(private readonly conexao: Knex) {}
+
+  async execute({ bandeira, busca, page, pageSize }: ListagemCartoesQueryIn): Promise<Result<PaginatedResultDTO<CartaoDTO>>> {
+    try {
+      const filtrada = this.conexao("cartao").modify((consulta) => {
+        if (bandeira) consulta.where("bandeira", bandeira);
+        if (busca) consulta.whereILike("apelido", `%${busca}%`);
+      });
+      const [{ total }] = await filtrada.clone().count<{ total: string }[]>({ total: "*" });
+      const linhas = await filtrada.clone().orderBy("apelido").orderBy("id").limit(pageSize).offset((page - 1) * pageSize);
+      return Result.ok({
+        data: linhas.map(CartaoMapper.toDTO),
+        meta: { page, pageSize, total: Number(total), totalPages: Math.ceil(Number(total) / pageSize) },
+      });
+    } catch {
+      return Result.fail("cartao.falha-ao-ler");
+    }
+  }
+}
 ```
 
 - Não redeclare `execute` na interface da consulta.
@@ -119,7 +188,7 @@ export interface NomeCartaoEmUsoQuery extends Query<NomeCartaoEmUsoDTO, boolean>
 ## Checklist de implementação
 
 - [ ] A operação consulta dados, ainda que o caso de uso consumidor seja um comando.
-- [ ] Interface `*Query` está em arquivo `*.query.ts` no `provider/` do submódulo. O arquivo declara só a query e, quando houver, o tipo de entrada dela.
+- [ ] Interface `*Query` está em arquivo `*.query.ts` no `provider/` do submódulo. O arquivo declara só a query e, quando houver, o tipo de entrada dela, chamado `<NomeDaQuery>In`.
 - [ ] A saída da query está em `dto/`, em arquivo `*.dto.ts` próprio.
 - [ ] `execute` retorna `Promise<Result<DTO>>`.
 - [ ] DTO está alinhado com necessidade do consumidor.
@@ -136,8 +205,10 @@ export interface NomeCartaoEmUsoQuery extends Query<NomeCartaoEmUsoDTO, boolean>
 
 ## Armadilhas comuns
 
-- Expor buscas no contrato do Repository por serem usadas antes da escrita.
+- Expor no contrato do Repository buscas além de `findById`.
+- Injetar uma Query de busca por ID em um caso de uso que já recebe o Repository da mesma entidade. O `findById` do Repository já faz essa leitura.
 - Retornar uma entidade em uma Query que deve entregar DTO.
 - Colocar regra de escrita numa query.
 - Acoplar DTO de leitura à estrutura de banco.
 - Misturar responsabilidades (query fazendo comando).
+- Chamar a entrada da query de `XxxFiltroDTO` ou colocá-la em `dto/`. O nome é `<NomeDaQuery>In`, no arquivo da query.

@@ -26,48 +26,48 @@
 6. Delegar invariantes de domínio para entidade/VO (`tryCreate`, `cloneWith`).
 7. Retornar resultado de provider/repo ou `Result.ok(...)` com DTO/agregado final.
 
-## Padrões observados no código
+## Padrões do caso de uso
 
 - Use case orquestra, não persiste diretamente.
-- Erros conhecidos são mapeados para constantes de domínio (`...Errors.NOT_FOUND`, etc.).
-- Dependência pode ser `Query` ou `Repository` conforme objetivo do caso:
-  - Leitura/projeção: preferir `Query` retornando DTO.
-  - Comando/escrita: preferir `Repository` e entidade de domínio.
-- Combinação de providers é comum:
-  - Exemplo: busca em query + agregação de dados (`GetAuthDashboardOverviewUseCase`).
-  - Exemplo: valida existência e cria dependência se necessário (`CreateMovementIn`).
-- Em update:
-  - Carregar estado atual (`findById`).
-  - Montar novo estado com fallback de campos atuais.
-  - Revalidar com entidade (`tryCreate`/`cloneWith`) antes de persistir.
+- Falhas são códigos no formato `entidade.motivo` (`pedido.nao-encontrado`), devolvidos com `Result.fail`. O fluxo usa retorno antecipado: `if (x.isFailure) return x.withFail;`.
+- Leitura e escrita usam portas diferentes:
+  - Caso de uso de leitura (`obter-pedido-por-id`, listagens): `Query`, que devolve DTO. Não depende do `Repository`.
+  - Caso de uso de escrita: `Repository`. `findById` carrega o estado (DTO) e os comandos recebem o DTO produzido pela entidade já validada (`Entidade.toDTO(entidade)`). Outras leituras de que ele precise (existência, registros ativos) são `Query`.
+- Em uma alteração:
+  - Carregar o estado atual com `repository.findById`.
+  - Reconstruir a entidade com `Entidade.tryCreate(dto)`.
+  - Aplicar a regra pelo método de domínio da entidade ou por `cloneWith`.
+  - Persistir com o `Repository`, entregando `Entidade.toDTO(...)`, e devolver esse mesmo DTO. Nenhuma porta recebe ou devolve a entidade.
+- Sem `try`/`catch`. Uma etapa que precisa capturar exceção inesperada vai para um método privado chamado por `Result.tryAsync`.
 
 ## Autorização
 
-Quando a operação depende de quem chama, o use case recebe o ator na entrada e autoriza antes de qualquer leitura ou efeito. O Auth responde fatos pela porta `AuthProvider` do módulo; o use case decide a política. A decisão está em `docs/adrs/shared/adr-shared-autorizacao-por-auth-provider.md`.
+Quando a operação depende de quem chama, o use case recebe o ator na entrada e autoriza antes de qualquer leitura ou efeito. O Auth responde fatos pela porta `AuthProvider` do módulo; o use case decide a política.
 
-- `Actor` vem de `@sagil/shared` e é obrigatório: `{ kind: "user", id, type }` ou `{ kind: "system", name }`.
-- A porta fica em `modules/<modulo>/src/app/provider/auth.provider.ts` e declara somente os métodos do catálogo da ADR que o módulo usa. Os códigos de permissão e de tipo de usuário são declarados pelo próprio módulo.
+- `Actor` vem do pacote compartilhado e é obrigatório: `{ kind: "user", id, type }` ou `{ kind: "system", name }`.
+- A porta fica em `modules/<modulo>/src/app/provider/auth.provider.ts` e declara somente os métodos que o módulo usa. Os códigos de permissão e de tipo de usuário são declarados pelo próprio módulo.
 - Uma resposta `false` é negação; um `Result` de falha significa que não foi possível verificar e é devolvido como falha, sem virar negação.
-- Não comparar `actor.type` com um valor nem estender `CasoDeUsoSuperAdmin`/`CasoDeUsoVendedor`.
+- Não comparar `actor.type` com um valor nem herdar de um caso de uso base que embute o tipo de usuário.
 
 ```ts
-export interface CancelXxxIn {
+export interface CancelarPedidoIn {
   actor: Actor;
   id: string;
 }
 
-export class CancelXxxUseCase implements UseCase<CancelXxxIn, XxxDTO> {
+export class CancelarPedidoUseCase implements UseCase<CancelarPedidoIn, PedidoDTO> {
   constructor(
-    private readonly repository: XxxRepository,
-    private readonly auth: Pick<AuthProvider, 'userHasType'>,
+    private readonly repository: PedidoRepository,
+    private readonly auth: Pick<AuthProvider, "userHasType">,
   ) {}
 
-  async execute({ actor, id }: CancelXxxIn): Promise<Result<XxxDTO>> {
-    const allowed = await this.auth.userHasType({ actor, types: ['VENDEDOR', 'SUPER_ADMIN'] });
-    if (allowed.isFailure) return allowed.withFail;
-    if (!allowed.instance) return Result.fail('xxx.acesso-negado');
+  async execute({ actor, id }: CancelarPedidoIn): Promise<Result<PedidoDTO>> {
+    const autorizado = PedidoAccessService.resolve(
+      await this.auth.userHasType({ actor, types: PedidoAccessService.MANAGER_TYPES }),
+    );
+    if (autorizado.isFailure) return autorizado.withFail;
 
-    // ... fluxo do caso de uso
+    // ... fluxo do caso de uso (ver "Exemplo completo")
   }
 }
 ```
@@ -77,24 +77,33 @@ export class CancelXxxUseCase implements UseCase<CancelXxxIn, XxxDTO> {
 Quando a operação não pode prosseguir sem uma decisão de quem chama, e essa decisão depende de dados, o use case devolve sucesso com um desfecho explícito. `Result.fail` fica para falhas, que carregam apenas códigos.
 
 ```ts
-export interface ApproveXxxIn {
+export interface FecharPedidoIn {
   actor: Actor;
   id: string;
-  confirmedInactiveUnitIds?: string[];
+  itensSemEstoqueConfirmadosIds?: string[];
 }
 
-export type ApproveXxxOut =
-  | { status: 'APPROVED'; xxx: XxxDTO }
-  | { status: 'CONFIRMATION_REQUIRED'; inactiveUnitIds: string[] };
+export type FecharPedidoOut =
+  | { status: "FECHADO"; pedido: PedidoDTO }
+  | { status: "CONFIRMACAO_ITENS_SEM_ESTOQUE_REQUERIDA"; itensSemEstoqueIds: string[] };
 
-export class ApproveXxxUseCase implements UseCase<ApproveXxxIn, ApproveXxxOut> {
-  async execute(data: ApproveXxxIn): Promise<Result<ApproveXxxOut>> {
-    // ...
-    if (inactive.length && !sameIds(inactive, data.confirmedInactiveUnitIds)) {
-      return Result.ok({ status: 'CONFIRMATION_REQUIRED', inactiveUnitIds: inactive });
+export class FecharPedidoUseCase implements UseCase<FecharPedidoIn, FecharPedidoOut> {
+  async execute(data: FecharPedidoIn): Promise<Result<FecharPedidoOut>> {
+    // ... autoriza, lê o pedido e consulta o estoque
+    const avaliacao = ItensSemEstoqueService.avaliar({
+      pedido,
+      itensDisponiveisIds,
+      itensSemEstoqueConfirmadosIds: data.itensSemEstoqueConfirmadosIds,
+    });
+    if (avaliacao.instance.exigeConfirmacao) {
+      // Quem chama precisa dos IDs para confirmar: é sucesso com desfecho, não falha.
+      return Result.ok({
+        status: "CONFIRMACAO_ITENS_SEM_ESTOQUE_REQUERIDA",
+        itensSemEstoqueIds: avaliacao.instance.itensSemEstoqueIds,
+      });
     }
-    // ...
-    return Result.ok({ status: 'APPROVED', xxx: Xxx.toDTO(approved.instance) });
+    // ... fecha e persiste
+    return Result.ok({ status: "FECHADO", pedido: Pedido.toDTO(fechado.instance) });
   }
 }
 ```
@@ -124,7 +133,7 @@ O controller responde com status de sucesso e o desfecho no corpo. O cliente lê
 - Persistência/leitura:
   - Usar `repo/query` apenas para acesso a dados.
   - Em leitura para API/front, priorizar `Query` com DTO de saída.
-  - Em escrita, ler com `Repository` quando necessário para preservar invariantes e salvar entidade.
+  - Em escrita, carregar o estado com `repository.findById`, reconstruir a entidade com `tryCreate` e salvar com `Repository`, entregando `Entidade.toDTO(entidade)`.
 
 ## Estratégia de testes
 
@@ -140,90 +149,120 @@ O controller responde com status de sucesso e o desfecho no corpo. O cliente lê
 - Não mapear falhas de dependências para erro de domínio quando necessário.
 - Atualizar parcialmente sem preservar `props` existentes.
 - Retornar exceção em vez de `Result.fail` dentro do fluxo normal.
+- Escrever `try`/`catch` no use case para engolir exceção de uma porta. As portas devolvem `Result`; quando for preciso capturar, usar `Result.tryAsync` em um método privado.
+- Deixar no arquivo de constantes um código de falha que nenhum fluxo emite mais.
 - Criar uma classe de erro do agregado (`class XxxError extends Error`) ou funções próprias que embrulham código baseado em exceções para devolver `Result`. Em refatoração, reescrever o fluxo com `Result`; não embrulhar o código antigo.
 - Declarar no arquivo do use case tipos além de `XxxIn` e `XxxOut`.
 - Extrair os campos comuns de dois `XxxIn` para uma interface ou DTO compartilhado. Cada `XxxIn` repete os campos de que precisa.
 
 ## Exemplo mínimo
 
-```ts
-import { Result, UseCase } from '@namespace/shared';
-import { Thing } from '../model/thing.entity';
-import { ThingRepository } from '../provider/thing.repository';
+`pedido/use-case/criar-pedido.use-case.ts`
 
-export interface CreateThingIn {
-  name: string;
+```ts
+import { Result, type UseCase } from "@poiesis/shared";
+import type { PedidoDTO } from "../dto/pedido.dto";
+import { Pedido } from "../model/pedido.entity";
+import type { PedidoRepository } from "../provider/pedido.repository";
+
+export interface CriarPedidoIn {
+  clienteId: string;
+  itens: { produtoId: string; quantidade: number }[];
 }
 
-export class CreateThingUseCase implements UseCase<CreateThingIn, void> {
-  constructor(private readonly repo: ThingRepository) {}
+export class CriarPedidoUseCase implements UseCase<CriarPedidoIn, PedidoDTO> {
+  constructor(private readonly repository: PedidoRepository) {}
 
-  async execute(data: CreateThingIn): Promise<Result<void>> {
-    return Result.try(async () => {
-      const thingResult = Thing.tryCreate({ name: data.name }).validator.throwsIfFailed().result.instance;
+  async execute({ clienteId, itens }: CriarPedidoIn): Promise<Result<PedidoDTO>> {
+    const pedido = Pedido.tryCreate({ clienteId, itens, status: "ABERTO" });
+    if (pedido.isFailure) return pedido.withFail;
 
-      const tryCreateThing = await this.repo.create(thingResult);
-      tryCreateThing.validator.throwsIfFailed();
-    });
+    // A porta recebe dado: o DTO sai da entidade, nunca de um objeto montado à mão.
+    const dto = Pedido.toDTO(pedido.instance);
+    const salvo = await this.repository.create(dto);
+    if (salvo.isFailure) return salvo.withFail;
+    return Result.ok(dto);
   }
 }
 ```
 
-## Exemplo completo com consulta (query) para criar um usuário
+## Exemplo completo: autorização, carga do estado e escrita por Repository
+
+`pedido/use-case/cancelar-pedido.use-case.ts`
 
 ```ts
-import { Password, PasswordCryptoProvider, PasswordRepository } from 'fake/path';
-import { Currency, DEFAULT_CURRENCY, Result, TransactionManager, UseCase } from '@poupig/shared';
-import { User, UserErrors, UserRepository } from 'fake/path';
-import { UserExistsQuery } from 'fake/path';
+import { Result, type Actor, type UseCase } from "@poiesis/shared";
+import type { AuthProvider } from "../../app/provider/auth.provider";
+import type { PedidoDTO } from "../dto/pedido.dto";
+import { Pedido } from "../model/pedido.entity";
+import type { PedidoRepository } from "../provider/pedido.repository";
+import { PedidoAccessService } from "../service/pedido-access.service";
 
-export interface CreateUserIn {
-  name: string;
-  email: string;
-  avatarUrl?: string;
-  currency?: string;
-  password: string;
+export interface CancelarPedidoIn {
+  actor: Actor;
+  id: string;
+  motivo: string;
 }
 
-export class CreateUserUseCase implements UseCase<CreateUserIn, void> {
+export class CancelarPedidoUseCase implements UseCase<CancelarPedidoIn, PedidoDTO> {
   constructor(
-    private readonly userRepo: UserRepository,
-    private readonly passRepo: PasswordRepository,
-    private readonly userExistsQuery: UserExistsQuery,
-    private readonly passwordCryptoProvider: PasswordCryptoProvider,
-    private readonly transactionManager: TransactionManager,
+    private readonly repository: PedidoRepository,
+    private readonly auth: Pick<AuthProvider, "userHasType">,
   ) {}
 
-  async execute(data: CreateUserIn): Promise<Result<void>> {
-    return Result.try(async () => {
-      const tryUserExists = await this.userExistsQuery.execute({
-        email: data.email,
-      });
-      tryUserExists.validator.throwsIfFailed().throwsIfTrue(UserErrors.EMAIL_ALREADY_EXISTS);
+  async execute({ actor, id, motivo }: CancelarPedidoIn): Promise<Result<PedidoDTO>> {
+    // 1. Autoriza antes de qualquer leitura.
+    const autorizado = PedidoAccessService.resolve(
+      await this.auth.userHasType({ actor, types: PedidoAccessService.MANAGER_TYPES }),
+    );
+    if (autorizado.isFailure) return autorizado.withFail;
 
-      const tryHashedPassword = await this.passwordCryptoProvider.hash(data.password);
-      const password = Password.create({ content: tryHashedPassword });
-      const tryCurrency = Currency.tryCreate(normalizedCode, {
-        attribute: 'currency',
-      }).validator.throwsIfFailed().result;
+    // 2. Carrega o estado (DTO) pelo repositório e reconstrói a entidade.
+    const encontrado = await this.repository.findById(id);
+    if (encontrado.isFailure) return encontrado.withFail;
+    if (!encontrado.instance) return Result.fail("pedido.nao-encontrado");
+    const pedido = Pedido.tryCreate(encontrado.instance);
+    if (pedido.isFailure) return pedido.withFail;
 
-      tryCurrency.validator.throwsIfFailed();
+    // 3. A regra de estado mora na entidade e devolve Result.
+    const cancelado = pedido.instance.cancelar(motivo);
+    if (cancelado.isFailure) return cancelado.withFail;
 
-      const user = User.tryCreate({
-        name: data.name,
-        email: data.email,
-        avatarUrl: data.avatarUrl?.trim() || undefined,
-        currency: tryCurrency.instance,
-      }).validator.throwsIfFailed().result.instance;
-
-      await this.transactionManager.runInTransaction(async (tx) => {
-        const tryCreateUser = await this.userRepo.create(user, tx);
-        tryCreateUser.validator.throwsIfFailed();
-
-        const tryCreatePass = await this.passRepo.create(password, user.id, tx);
-        tryCreatePass.validator.throwsIfFailed();
-      });
-    });
+    // 4. Persiste o DTO produzido pela entidade e o devolve.
+    const dto = Pedido.toDTO(cancelado.instance);
+    const salvo = await this.repository.update(dto);
+    if (salvo.isFailure) return salvo.withFail;
+    return Result.ok(dto);
   }
+}
+```
+
+## Exemplo: etapa que não pode deixar escapar uma exceção
+
+Depois que o provedor de pagamento aceitou a cobrança, uma exceção inesperada não pode fazer o sistema esquecer esse aceite. A etapa vai para um método privado chamado por `Result.tryAsync`, e o `execute` trata o `Result` de falha. Não há `try`/`catch` no caso de uso.
+
+```ts
+async execute({ pedidoId }: CobrarPedidoIn): Promise<Result<CobrarPedidoOut>> {
+  // ... lê o pedido e cria a cobrança no provedor
+  const cobrancaId = criada.instance.id;
+
+  const confirmada = await Result.tryAsync(() => this.confirmarCobranca({ pedido, cobrancaId }));
+  if (confirmada.isFailure) {
+    // O aceite já aconteceu: registra a pendência para reconciliar, em vez de criar outra cobrança.
+    const pendente = await this.repository.marcarCobrancaPendente({ pedidoId, cobrancaId });
+    return pendente.isFailure ? pendente.withFail : Result.ok({ status: "PROCESSANDO" });
+  }
+  return confirmada;
+}
+
+private async confirmarCobranca({ pedido, cobrancaId }: {
+  pedido: Pedido;
+  cobrancaId: string;
+}): Promise<Result<CobrarPedidoOut>> {
+  const pago = pedido.registrarCobranca(cobrancaId);
+  if (pago.isFailure) return pago.withFail;
+  const salvo = await this.repository.update(Pedido.toDTO(pago.instance));
+  if (salvo.isFailure) return salvo.withFail;
+  return Result.ok({ status: "SUCESSO", pedido: Pedido.toDTO(pago.instance) });
 }
 ```

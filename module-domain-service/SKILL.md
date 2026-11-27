@@ -13,9 +13,11 @@ Encapsule uma regra de negócio que não pertence naturalmente a um único objet
 ## Guidelines
 
 - Leia [domain-service-pattern.md](references/domain-service-pattern.md) antes de criar ou alterar um serviço de domínio.
-- Mantenha o serviço no domínio proprietário. Receba os dados necessários e deixe I/O, persistência e coordenação de operações com os casos de uso e adaptadores.
+- Mantenha o serviço no domínio proprietário. Por padrão ele recebe os dados necessários, e o caso de uso consulta as portas. Exceção: quando vários casos de uso repetiriam a mesma sequência de consultas para chegar ao mesmo fato, o serviço pode receber as portas como parâmetro e fazer as consultas ele mesmo, devolvendo `Result`. Persistência e efeitos continuam nos casos de uso.
 - Quando um método do serviço recebe um conjunto de campos, declare o tipo do parâmetro na própria assinatura do método, seja o serviço usado por um ou por vários casos de uso. Não crie uma interface ou DTO nomeado só para tipar a entrada do serviço.
-- Preserve invariantes intrínsecas nas entidades e objetos de valor. Prefira uma função ou classe simples, nomeada pela intenção da regra.
+- Declare o serviço como classe `XxxService` em `service/xxx.service.ts`, com métodos estáticos quando não guarda estado. Não exporte funções soltas de um arquivo `*.service.ts` nem reexporte o serviço pelo barrel de outra pasta.
+- Devolva `Result` quando a regra pode falhar, com códigos no formato `entidade.motivo`. Não use `try`/`catch` nem `throw`.
+- Preserve invariantes intrínsecas nas entidades e objetos de valor. Nomeie a classe pela intenção da regra.
 
 ## Workflow
 

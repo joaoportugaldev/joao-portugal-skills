@@ -52,7 +52,7 @@
 ## Exemplo mínimo
 
 ```ts
-import { Entity, EntityProps, Id, Name, Result } from '@namespace/shared';
+import { Entity, EntityProps, Id, Name, Result } from '@poiesis/shared';
 
 export interface ExampleProps extends EntityProps {
   name: string;
