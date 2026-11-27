@@ -1,6 +1,6 @@
 ---
 name: config-shared-core
-description: Inicializar o módulo `packages/shared` como submódulo Git (`https://github.com/mentoria-360/shared.git`), validar o contrato mínimo do pacote (base, db, dto, error, vo, testes) e sincronizar dependências do workspace. Usar quando o pedido envolver bootstrap do pacote shared, vincular o submódulo shared ao projeto, reset da base compartilhada ou provisionamento do core compartilhado no monorepo.
+description: Inicializar o módulo `packages/shared` como submódulo Git (`https://github.com/joaoportugaldev/shared.git`), validar o contrato mínimo do pacote (base, db, dto, error, vo, testes) e sincronizar dependências do workspace. Usar quando o pedido envolver bootstrap do pacote shared, vincular o submódulo shared ao projeto, reset da base compartilhada ou provisionamento do core compartilhado no monorepo.
 ---
 
 # Config Shared Core
@@ -14,15 +14,15 @@ Configuração padrão do submódulo:
 ```gitconfig
 [submodule "packages/shared"]
   path = packages/shared
-  url = https://github.com/mentoria-360/shared.git
+  url = https://github.com/joaoportugaldev/shared.git
 ```
 
 O script `create-shared.mjs`:
 
 1. Adiciona ou inicializa o submódulo em `<sharedModulePath>`.
 2. Valida o contrato mínimo do conteúdo clonado (sem copiar template local).
-3. Valida que o `name` do `package.json` do shared é `@mentoria-360/shared` (nome fixo; o shared não segue o namespace do projeto).
-4. Registra `"@mentoria-360/shared": "*"` no frontend/backend e executa `npm install` na raiz.
+3. Valida que o `name` do `package.json` do shared é `@poiesis/shared` (nome fixo; o shared não segue o namespace do projeto).
+4. Registra `"@poiesis/shared": "*"` no frontend/backend e executa `npm install` na raiz.
 
 Caminhos e URL do submódulo são resolvidos por `skills.config.json` (na raiz do repositório consumidor ou em `.env/` do projeto).
 
@@ -33,7 +33,7 @@ Contrato mínimo esperado no submódulo:
 - `Password` em `src/vo/password.vo.ts`
 - erros de validação em `src/errors/validation-error.ts`
 - paginação em `src/query/pagination.dto.ts`
-- testes base/vo/db alinhados ao repositório canônico `mentoria-360/shared`
+- testes base/vo/db alinhados ao repositório canônico `joaoportugaldev/shared`
 
 ## Pré-requisitos
 
@@ -43,13 +43,13 @@ Contrato mínimo esperado no submódulo:
 ## Workflow
 
 1. Executar `node scripts/create-shared.mjs`.
-2. O nome do pacote shared é fixo (`@mentoria-360/shared`); `--scope`/`PROJECT_NAMESPACE` não o alteram.
-3. URL do submódulo resolvida por: `skills.config.local.json` > `skills.config.json` > default `https://github.com/mentoria-360/shared.git`.
+2. O nome do pacote shared é fixo (`@poiesis/shared`); `--scope`/`PROJECT_NAMESPACE` não o alteram.
+3. URL do submódulo resolvida por: `skills.config.local.json` > `skills.config.json` > default `https://github.com/joaoportugaldev/shared.git`.
 4. Se `<sharedModulePath>` existir sem ser submódulo, ou se a URL registrada divergir, usar `--force` para substituir.
 5. Validar contrato mínimo do submódulo após `git submodule add` ou `git submodule update --init --recursive`.
-6. Atualizar `"@mentoria-360/shared": "*"` em frontend/backend (sem remover outras dependências).
+6. Atualizar `"@poiesis/shared": "*"` em frontend/backend (sem remover outras dependências).
 7. Executar `npm install` na raiz do workspace.
-8. Opcionalmente executar testes com `--run-tests`: `npm run test -w @mentoria-360/shared`.
+8. Opcionalmente executar testes com `--run-tests`: `npm run test -w @poiesis/shared`.
 9. Registrar execução em `.log/skills.log`.
 10. Formatar o projeto com `npm run format` na raiz, quando aplicável.
 
@@ -89,7 +89,7 @@ node <SKILLS_DIR>/config-shared-core/scripts/create-shared.mjs --force --run-tes
 - Override local (gitignored): `skills.config.local.json` no mesmo diretório
 - Campos relevantes:
   - `sharedModulePath` (default: `packages/shared`)
-  - `sharedSubmoduleUrl` (default: `https://github.com/mentoria-360/shared.git`)
+  - `sharedSubmoduleUrl` (default: `https://github.com/joaoportugaldev/shared.git`)
 
 ## Risk Logging Guardrails
 

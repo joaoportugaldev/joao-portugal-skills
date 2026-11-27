@@ -9,12 +9,12 @@ const LOCAL_CONFIG_FILE = 'skills.config.local.json';
 
 // Nome fixo do pacote compartilhado. O shared é um submódulo Git externo com escopo
 // próprio e não segue o namespace do projeto consumidor.
-export const SHARED_PACKAGE_NAME = '@mentoria-360/shared';
+export const SHARED_PACKAGE_NAME = '@poiesis/shared';
 
 const DEFAULT_CONFIG = {
   namespace: '',
   sharedModulePath: 'packages/shared',
-  sharedSubmoduleUrl: 'https://github.com/mentoria-360/shared.git',
+  sharedSubmoduleUrl: 'https://github.com/joaoportugaldev/shared.git',
   frontendAppPath: 'apps/frontend',
   backendAppPath: 'apps/backend',
   frontendPort: 3000,

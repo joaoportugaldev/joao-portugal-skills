@@ -6,7 +6,7 @@
     "modulesDir": "modules",
     "packagesDir": "packages",
     "sharedModulePath": "packages/shared",
-    "sharedSubmoduleUrl": "https://github.com/mentoria-360/shared.git",
+    "sharedSubmoduleUrl": "https://github.com/joaoportugaldev/shared.git",
     "frontendAppPath": "apps/frontend",
     "backendAppPath": "apps/backend",
     "frontendPort": 3000,

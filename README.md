@@ -129,9 +129,9 @@ em runtime e funcionam em qualquer local.
 
 Parâmetros principais disponíveis hoje:
 
-- `namespace`: namespace dos packages do projeto (ex.: `@my-org`). Não se aplica ao shared, cujo nome é fixo: `@mentoria-360/shared`
+- `namespace`: namespace dos packages do projeto (ex.: `@my-org`). Não se aplica ao shared, cujo nome é fixo: `@poiesis/shared`
 - `sharedModulePath`: caminho relativo completo do módulo shared (ex.: `packages/shared`, `packages/common-shared`)
-- `sharedSubmoduleUrl`: URL Git do submódulo shared (default: `https://github.com/mentoria-360/shared.git`)
+- `sharedSubmoduleUrl`: URL Git do submódulo shared (default: `https://github.com/joaoportugaldev/shared.git`)
 - `frontendAppPath`: caminho relativo completo da app frontend (ex.: `apps/frontend`, `applications/front`)
 - `backendAppPath`: caminho relativo completo da app backend (ex.: `apps/backend`, `services/api`)
 - `frontendPort`: porta padrão da app frontend
