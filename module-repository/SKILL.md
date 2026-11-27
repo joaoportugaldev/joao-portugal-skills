@@ -11,7 +11,7 @@ Definir repositórios de módulo que exponham exclusivamente comandos de persist
 
 ## Guidelines
 
-- Definir contrato em `modules/*/src/**/provider/*.repository.ts`.
+- Definir contrato em `modules/*/src/**/provider/*.repository.ts`, com uma única interface por arquivo. Tipos de entrada ou saída do contrato são DTOs em `dto/`.
 - Reutilizar bases de shared que exponham somente os comandos necessários, como `CreateRepository`. Contratos que incluem métodos de leitura ficam fora da interface de Repository.
 - Implementar em adapter de infraestrutura (ex.: `apps/backend/src/**/*.prisma.ts`) retornando `Result`.
 - Extrair o mapeamento explícito de persistência para `*.mapper.ts`, junto ao adaptador de banco. Usar `static toTable(entity)` para gerar a linha de escrita.

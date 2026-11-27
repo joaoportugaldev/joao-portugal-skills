@@ -72,6 +72,35 @@ export class CancelXxxUseCase implements UseCase<CancelXxxIn, XxxDTO> {
 }
 ```
 
+## Resultado que exige uma ação de quem chama
+
+Quando a operação não pode prosseguir sem uma decisão de quem chama, e essa decisão depende de dados, o use case devolve sucesso com um desfecho explícito. `Result.fail` fica para falhas, que carregam apenas códigos.
+
+```ts
+export interface ApproveXxxIn {
+  actor: Actor;
+  id: string;
+  confirmedInactiveUnitIds?: string[];
+}
+
+export type ApproveXxxOut =
+  | { status: 'APPROVED'; xxx: XxxDTO }
+  | { status: 'CONFIRMATION_REQUIRED'; inactiveUnitIds: string[] };
+
+export class ApproveXxxUseCase implements UseCase<ApproveXxxIn, ApproveXxxOut> {
+  async execute(data: ApproveXxxIn): Promise<Result<ApproveXxxOut>> {
+    // ...
+    if (inactive.length && !sameIds(inactive, data.confirmedInactiveUnitIds)) {
+      return Result.ok({ status: 'CONFIRMATION_REQUIRED', inactiveUnitIds: inactive });
+    }
+    // ...
+    return Result.ok({ status: 'APPROVED', xxx: Xxx.toDTO(approved.instance) });
+  }
+}
+```
+
+O controller responde com status de sucesso e o desfecho no corpo. O cliente lê `status` para decidir o próximo passo.
+
 ## Checklist de implementação
 
 - Autorização (quando aplicável):
@@ -111,6 +140,9 @@ export class CancelXxxUseCase implements UseCase<CancelXxxIn, XxxDTO> {
 - Não mapear falhas de dependências para erro de domínio quando necessário.
 - Atualizar parcialmente sem preservar `props` existentes.
 - Retornar exceção em vez de `Result.fail` dentro do fluxo normal.
+- Criar uma classe de erro do agregado (`class XxxError extends Error`) ou funções próprias que embrulham código baseado em exceções para devolver `Result`. Em refatoração, reescrever o fluxo com `Result`; não embrulhar o código antigo.
+- Declarar no arquivo do use case tipos além de `XxxIn` e `XxxOut`.
+- Extrair os campos comuns de dois `XxxIn` para uma interface ou DTO compartilhado. Cada `XxxIn` repete os campos de que precisa.
 
 ## Exemplo mínimo
 

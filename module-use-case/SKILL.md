@@ -15,6 +15,11 @@ Aplicar o padrão de casos de uso do projeto com foco em orquestração de depen
 - Implementar o contrato `UseCase<IN, OUT>` com `execute(data: IN): Promise<Result<OUT>>`.
 - Declarar em `IN` os tipos esperados sempre que forem conhecidos. Reservar `unknown` para entradas cujo formato seja genuinamente desconhecido.
 - No controller, converter parâmetros de rota, filtros e corpo HTTP nos tipos de `IN` antes de chamar `execute`. Deixar a validação das regras de negócio no caso de uso, na entidade ou no Value Object responsável.
+- Declarar `XxxIn` e, quando houver, `XxxOut` no próprio arquivo do use case, com o nome da operação (`CriarContratoIn`, `CriarContratoOut`). São os únicos tipos declarados ali: filtros, projeções e demais DTOs ficam em `dto/`, um por arquivo, e são importados.
+- Declarar em cada `XxxIn` todos os seus campos, de forma independente dos outros use cases. Não criar interface ou DTO para compartilhar campos entre entradas de use cases diferentes, nem fazer um `XxxIn` estender outro, mesmo quando os campos se repetem.
+- Reportar falhas esperadas somente com `Result`, conforme o `README.md` do pacote compartilhado. Não criar classes de erro do agregado, não criar helpers próprios para converter exceção em `Result` e não deixar `throw` atravessar o `execute`. Códigos de falha seguem o formato `entidade.motivo`.
+- Uma falha carrega só os códigos. Não anexar o valor recusado, o nome da classe ou do use case nem outro contexto. Quando quem chama precisa de dados para decidir o próximo passo (por exemplo, quais unidades exigem confirmação), a operação não falhou: declarar `XxxOut` como união discriminada por `status`, com os dados de cada variante, e devolver `Result.ok(...)`.
+- Não receber conversores injetados nem depender de Facade. Montar a saída com `Entidade.toDTO`, com métodos do objeto de valor, com um serviço de domínio quando a regra é compartilhada, ou no próprio use case quando é pontual.
 - Manter o use case como orquestrador: valida fluxo, chama providers/repos/queries e delega invariantes para entidades/VOs.
 - Injetar dependências via construtor com interfaces de provider/repository/query.
 - Tratar falhas cedo (`early return`) com `Result.fail(...)` ou `result.withFail`.

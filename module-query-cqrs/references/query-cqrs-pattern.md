@@ -79,19 +79,39 @@ O adaptador envolve o DTO ou a página em `Result`, mantendo contagens e pagina�
 
 ## Listagens paginadas
 
-- Estender os filtros da query e a entrada do caso de uso com `EntradaPaginacao`. Usar `Promise<Result<ResultadoPaginacao<ItemDTO>>>` como retorno da query e preservar os metadados quando o caso de uso transformar `itens`.
-- Validar `pagina` e `tamanhoPagina` como inteiros positivos quando informados. Em contratos com `Result`, retornar `Result.fail` para valores inválidos. `Paginacao.validarParametros` lança exceção e, sozinho, aceita números fracionários e não finitos.
-- No adaptador, usar os valores padrão de `Paginacao` e calcular o deslocamento com `getIdxInicioFim`. Aplicar filtros e ordenação determinística, com ID único como desempate, antes de `limit` e `offset`.
-- Calcular `totalGeral` antes dos filtros opcionais, dentro do escopo autorizado, e `totalAposFiltros` com os mesmos filtros da seleção dos itens. Ambos os totais ignoram o recorte da página. Montar o retorno com `Paginacao.formatarResultado`, que recebe os itens da página já recortados.
+- Usar os contratos do pacote compartilhado, sem redeclará-los: o DTO de filtro estende `PaginatedInputDTO` (`page`, `pageSize`) e a query retorna `Promise<Result<PaginatedResultDTO<ItemDTO>>>` (`data` e `meta`). Preservar `meta` quando o caso de uso transformar `data`.
+- Validar `page` e `pageSize` como inteiros positivos. Retornar `Result.fail` para valores inválidos.
+- No adaptador, calcular o deslocamento como `(page - 1) * pageSize`. Aplicar filtros e ordenação determinística, com ID único como desempate, antes de `limit` e `offset`.
+- Calcular `meta.total` com os mesmos filtros da seleção dos itens, dentro do escopo autorizado e ignorando o recorte da página. Calcular `meta.totalPages` a partir de `total` e `pageSize`.
 - Para consultas operacionais que precisam processar todos os candidatos, preservar a leitura completa ou definir um processamento em lotes que percorra o conjunto inteiro.
 
 ## Contrato esperado
 
+O pacote compartilhado define o formato comum:
+
 ```ts
-export interface FindXxxQuery {
-  execute(input: InputDTO): Promise<Result<OutputDTO>>;
+export interface Query<IN, OUT> {
+  execute(input: IN): Promise<Result<OUT>>;
 }
 ```
+
+Cada consulta do módulo estende esse contrato, em arquivo próprio:
+
+```ts
+// provider/cartoes-paginados.query.ts
+export interface CartoesPaginadosQuery extends Query<PaginatedInputDTO, PaginatedResultDTO<CartaoDTO>> {}
+
+// provider/nome-cartao-em-uso.query.ts — a entrada da query fica no arquivo da query
+export interface NomeCartaoEmUsoDTO {
+  name: string;
+  ignoreId?: string;
+}
+
+export interface NomeCartaoEmUsoQuery extends Query<NomeCartaoEmUsoDTO, boolean> {}
+```
+
+- Não redeclare `execute` na interface da consulta.
+- Uma consulta tem uma única operação. Divida interfaces com vários métodos de leitura em uma `*Query` por operação.
 
 - `InputDTO` pode ser primitivo, objeto de filtro ou paginação.
 - `OutputDTO` pode ser item único, coleção paginada, painel agregado etc.
@@ -99,7 +119,8 @@ export interface FindXxxQuery {
 ## Checklist de implementação
 
 - [ ] A operação consulta dados, ainda que o caso de uso consumidor seja um comando.
-- [ ] Interface `*Query` está em arquivo `*.query.ts` no `provider/` do submódulo.
+- [ ] Interface `*Query` está em arquivo `*.query.ts` no `provider/` do submódulo. O arquivo declara só a query e, quando houver, o tipo de entrada dela.
+- [ ] A saída da query está em `dto/`, em arquivo `*.dto.ts` próprio.
 - [ ] `execute` retorna `Promise<Result<DTO>>`.
 - [ ] DTO está alinhado com necessidade do consumidor.
 - [ ] Use case de leitura mapeia `isFailure` para erro de domínio quando necessário.

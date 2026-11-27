@@ -14,6 +14,7 @@ Encapsule uma regra de negócio que não pertence naturalmente a um único objet
 
 - Leia [domain-service-pattern.md](references/domain-service-pattern.md) antes de criar ou alterar um serviço de domínio.
 - Mantenha o serviço no domínio proprietário. Receba os dados necessários e deixe I/O, persistência e coordenação de operações com os casos de uso e adaptadores.
+- Quando um método do serviço recebe um conjunto de campos, declare o tipo do parâmetro na própria assinatura do método, seja o serviço usado por um ou por vários casos de uso. Não crie uma interface ou DTO nomeado só para tipar a entrada do serviço.
 - Preserve invariantes intrínsecas nas entidades e objetos de valor. Prefira uma função ou classe simples, nomeada pela intenção da regra.
 
 ## Workflow

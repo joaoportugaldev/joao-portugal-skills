@@ -12,7 +12,8 @@ Um DTO pode levar dados para uma operação, devolver um resultado ou representa
 - Para saída derivada diretamente de uma entidade, defina `static toDTO(entidade: Entidade): EntidadeDTO` na classe da entidade. Importe o DTO somente como tipo; a entidade não deve carregar código de adapter em tempo de execução.
 - Em campos aninhados, use `OutraEntidade.toDTO` quando o contrato do campo for aquele DTO. Preserve outro formato declarado, como um objeto de propriedades, quando for o contrato vigente.
 - Chame `Entidade.toDTO(entidade)` nos consumidores. Se a origem for `Props`, reconstrua a entidade apenas quando isso preservar o comportamento esperado. Quando a construção alterar ou rejeitar dados de leitura válidos, o método estático pode aceitar esse tipo de `Props` explicitamente e preservar a saída anterior; não use essa exceção para contornar validação em escrita.
-- Reutilize o envelope de paginação do projeto. Quando o contrato exigir metadados, mantenha-os separados dos itens.
+- Reutilize o envelope de paginação do pacote compartilhado (`PaginatedResultDTO<T>`, com `data` e `meta`). Não declare um envelope local.
+- Um arquivo `*.dto.ts` declara um único DTO. As exceções da regra de uma declaração por arquivo estão em `skills-standards.md`.
 
 ## Exemplo
 
@@ -51,6 +52,8 @@ export class Produto extends Entity<Produto, ProdutoProps> {
 
 ## Armadilhas comuns
 
+- Declarar dois DTOs no mesmo arquivo, ou declarar um DTO no arquivo de uma porta, serviço ou caso de uso.
+- Criar um DTO de paginação próprio do agregado em vez de usar o do pacote compartilhado.
 - Retornar a entidade diretamente ou espalhar suas propriedades no payload. Selecione os campos públicos em `toDTO`.
 - Reutilizar o mesmo DTO para operações cujos contratos evoluem de forma independente. Modele a forma que cada consumidor precisa.
 - Acoplar a resposta pública à estrutura de armazenamento. Converta para a representação da fronteira.

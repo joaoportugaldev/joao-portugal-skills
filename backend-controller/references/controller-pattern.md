@@ -38,7 +38,9 @@ import type { CriarTestePremiumIn, TestePremiumDTO } from "@sagil/comercial";
 type CriarTestePremium = UseCase<CriarTestePremiumIn, TestePremiumDTO>;
 ```
 
-### Exemplo com facade
+### Exemplo legado com facade
+
+Este exemplo mostra a estrutura de registro de rotas em controllers que ainda dependem de uma Facade. Em agregados novos ou refatorados, injete os casos de uso diretamente, como no trecho acima; não crie Facade.
 
 O middleware injetado autentica a requisição e preenche `req.jwtDecoded` antes de chamar o handler. O controller converte a sessão em `Actor` com `requireActor` e o entrega à operação; ele não decide quem pode executá-la.
 

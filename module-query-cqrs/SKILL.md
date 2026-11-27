@@ -15,7 +15,9 @@ Separar consultas de comandos e retornar DTOs adequados ao consumidor, inclusive
 - Reservar o contrato do Repository a comandos como `create`, `update` e `delete`. Em um caso de uso de escrita, injetar a Query para obter o estado e o Repository para persistir a alteração.
 - Implementar query no adapter de infraestrutura (ex.: Prisma) retornando DTO.
 - Extrair a conversão de linhas em DTOs para métodos estáticos de `*.mapper.ts`. Compartilhar o mapper com o repositório da mesma funcionalidade quando ambos mapearem a mesma tabela.
-- Nas listagens paginadas, usar `EntradaPaginacao`, `ResultadoPaginacao<T>` e `Paginacao` do pacote compartilhado. Seguir o padrão de filtros, contagens e ordenação descrito na referência.
+- Declarar cada consulta estendendo `Query<IN, OUT>` do pacote compartilhado, sem redeclarar a assinatura de `execute`: `export interface CartoesPaginadosQuery extends Query<PaginatedInputDTO, PaginatedResultDTO<CartaoDTO>> {}`. Cada consulta tem uma única operação; uma interface com vários métodos de leitura (`obterPorId`, `obterVarios`) deve ser dividida em uma `*Query` por operação.
+- Declarar uma única interface `*Query` por arquivo. A entrada da query (seu filtro) é declarada nesse mesmo arquivo, com nome terminado em `DTO`. A saída é sempre um DTO em `dto/`, em arquivo próprio.
+- Nas listagens paginadas, usar `PaginatedInputDTO`, `PaginatedResultDTO<T>` e `PaginationMetaDTO` do pacote compartilhado, sem redeclará-los nem criar DTO de página local. Seguir o padrão de filtros, contagens e ordenação descrito na referência.
 - Manter use case de leitura fino: chamar query, mapear falhas e aplicar formatação complementar quando necessário.
 - Não acoplar query a regras de domínio de escrita.
 - DTO de query:
